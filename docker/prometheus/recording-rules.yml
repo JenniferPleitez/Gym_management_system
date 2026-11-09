@@ -1,0 +1,68 @@
+groups:
+  - name: cache_service_recordings
+    interval: 30s
+    rules:
+      - record: job:cache:hits:rate5m
+        expr: sum by (component) (rate(cache_operation_hits_total[5m]))
+
+      - record: job:cache:misses:rate5m
+        expr: sum by (component) (rate(cache_operation_misses_total[5m]))
+
+      - record: job:cache:writes:rate5m
+        expr: sum by (component) (rate(cache_operation_writes_total[5m]))
+
+      - record: job:cache:evictions:rate5m
+        expr: sum by (component) (rate(cache_operation_evictions_total[5m]))
+
+      - record: job:cache:updates:rate5m
+        expr: sum by (component) (rate(cache_operation_updates_total[5m]))
+      
+      - record: job:cache:hit_rate:ratio5m
+        expr: |
+          sum by (component) (rate(cache_operation_hits_total[5m]))
+          /
+          ( sum by (component) (rate(cache_operation_hits_total[5m])) + sum by (component) (rate(cache_operation_misses_total[5m])) + 1e-9 )
+
+      - record: job:cache:load_duration_buckets:rate5m
+        expr: sum by (component, le) (rate(cache_load_duration_seconds_bucket[5m]))
+  
+  - name: cache_service_per_instance
+    interval: 30s
+    rules:
+
+      # Hits / Misses / Writes / Updates / Evictions
+      - record: instance:cache:hits:rate5m
+        expr: sum by (component, instance) (rate(cache_operation_hits_total[5m]))
+
+      - record: instance:cache:misses:rate5m
+        expr: sum by (component, instance) (rate(cache_operation_misses_total[5m]))
+
+      - record: instance:cache:writes:rate5m
+        expr: sum by (component, instance) (rate(cache_operation_writes_total[5m]))
+
+      - record: instance:cache:updates:rate5m
+        expr: sum by (component, instance) (rate(cache_operation_updates_total[5m]))
+
+      - record: instance:cache:evictions:rate5m
+        expr: sum by (component, instance) (rate(cache_operation_evictions_total[5m]))
+    
+  - name: cache_executor
+    interval: 30s
+    rules:
+
+      - record: job:cache_executor:rejections:rate5m
+        expr: sum by (component) (rate(cache_executor_rejections_total[5m]))
+
+      - record: job:cache_executor:task_duration_buckets:rate5m
+        expr: sum by (component, le) (rate(cache_executor_task_duration_seconds_bucket[5m]))
+
+  - name: cache_errors
+    interval: 30s
+    rules:
+
+      - record: job:cache:errors:rate5m
+        expr: sum by (component) (rate(cache_operation_errors_total[5m]))
+
+      # Conteo absoluto de errores en los últimos 5m (equivalente a increase())
+      - record: job:cache:errors:last5m
+        expr: sum by (component, errorType) (increase(cache_operation_errors_total[5m]))

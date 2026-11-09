@@ -1,0 +1,151 @@
+services:
+  redis:
+    image: redis:7.0.15
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
+      - ./prometheus/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:9090/-/ready >/dev/null 2>&1 || curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+  
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:3000/api/health >/dev/null 2>&1 || curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  postgres-exporter:
+    image: bitnami/postgres-exporter
+    container_name: exporter
+    ports: 
+      - "9187:9187"
+    environment:
+        DATA_SOURCE_NAME: "postgresql://${DATA_SOURCE_USER}:${DATA_SOURCE_PASS}@host.docker.internal:5432/${DATABASE_NAME}?sslmode=disable"
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:9187/metrics >/dev/null 2>&1 || curl -fsS http://127.0.0.1:9187/metrics >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  alertmanager:
+    image: prom/alertmanager:v0.30.1
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alert-manager/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml:ro
+      - ./alert-manager/template/:/etc/alertmanager/template/:ro
+      - alertmanager-data:/alertmanager
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Preparando configuración..."
+        cp /etc/alertmanager/alertmanager.yaml /tmp/alertmanager.yml
+        
+        sed -i "s|\$${SMTP_HOST}|$SMTP_HOST|g" /tmp/alertmanager.yml
+        sed -i "s|\$${SMTP_PORT}|$SMTP_PORT|g" /tmp/alertmanager.yml
+        sed -i "s|\$${SMTP_FROM}|$SMTP_FROM|g" /tmp/alertmanager.yml
+        sed -i "s|\$${SMTP_USER}|$SMTP_USER|g" /tmp/alertmanager.yml
+        sed -i "s|\$${SMTP_PASS}|$SMTP_PASS|g" /tmp/alertmanager.yml
+        sed -i "s|\$${ALERT_RECEIVER_EMAIL}|$ALERT_RECEIVER_EMAIL|g" /tmp/alertmanager.yml
+        sed -i "s|\$${SLACK_WEBHOOK_URL}|$SLACK_WEBHOOK_URL|g" /tmp/alertmanager.yml
+        
+        echo "Iniciando Alertmanager en puerto 9093..."
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
+    environment:
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - ALERT_RECEIVER_EMAIL=${ALERT_RECEIVER_EMAIL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:9093/-/ready >/dev/null 2>&1 || curl -fsS http://127.0.0.1:9093/-/ready >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # UI Web
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:8025/ >/dev/null 2>&1 || curl -fsS http://127.0.0.1:8025/ >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:0.56.2
+    container_name: cadvisor
+    ports:
+      - "8082:8080" # Fuera de docker usa el 8082 para evitar conflicto con Spring Boot que está ahorita en el 8080 y con Acuator en el 8081
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "wget --no-verbose --spider http://127.0.0.1:8080/metrics >/dev/null 2>&1 || curl -fsS http://127.0.0.1:8080/metrics >/dev/null 2>&1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  grafana-storage:
+  prometheus-data:
+  alertmanager-data:

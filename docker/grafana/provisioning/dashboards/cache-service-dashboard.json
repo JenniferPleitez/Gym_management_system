@@ -1,0 +1,289 @@
+{
+  "id": null,
+  "title": "Gym App - SRE Dashboard",
+  "uid": "gym-sre-operations-dashboard",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "alertlist",
+      "title": "Activate Alerts (Alertmanager)",
+      "id": 1,
+      "datasource": "Alertmanager",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 6},
+      "options": {
+        "showInAlertState": ["firing"],
+        "viewMode": "list"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "CPU Usage (Docker App Container)",
+      "id": 2,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 4},
+      "targets": [
+        {
+          "expr": "(sum(rate(container_cpu_usage_seconds_total{name=~\"^($container|/)$\"}[5m])) / count(node_cpu_seconds_total{mode=\"idle\"}) * 100) or vector(0)",
+          "legendFormat": "CPU %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 70},
+              {"color": "red", "value": 90}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "RAM Usage (Docker App Container)",
+      "id": 3,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 4},
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{name=~\"^($container|/)$\"}) or vector(0)",
+          "legendFormat": "RAM"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1073741824}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Cache Hit Ratio (%)",
+      "id": 4,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 10, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "100 * job:cache:hit_rate:ratio5m{component=\"$component\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["last"]}}
+    },
+    {
+      "type": "stat",
+      "title": "Cache Miss Rate (rps)",
+      "id": 5,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 8, "y": 10, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "job:cache:misses:rate5m{component=\"$component\"}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Estimated cached accounts",
+      "id": 6,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 16, "y": 10, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "cache_account_active_estimated{component=\"$component\"}", 
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["last"]}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache ops: hits / misses / writes / updates / evictions",
+      "id": 7,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 14, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "instance:cache:hits:rate5m{component=\"$component\"}", 
+          "legendFormat": "hits {{instance}}", 
+          "refId": "A"
+        },
+        {
+          "expr": "instance:cache:misses:rate5m{component=\"$component\"}",
+          "legendFormat": "misses {{instance}}", 
+          "refId": "B"
+        },
+        {
+          "expr": "instance:cache:writes:rate5m{component=\"$component\"}",
+          "legendFormat": "writes {{instance}}", 
+          "refId": "C"
+        },
+        {
+          "expr": "instance:cache:updates:rate5m{component=\"$component\"}",
+          "legendFormat": "updates {{instance}}", 
+          "refId": "D"
+        },
+        {
+          "expr": "instance:cache:evictions:rate5m{component=\"$component\"}",
+          "legendFormat": "evictions {{instance}}", 
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}}
+    },
+    {
+      "type": "stat",
+      "title": "Total cache errores",
+      "id": 8,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 22, "w": 12, "h": 6},
+      "targets": [
+        {
+          "expr": "job:cache:errors:rate5m{component=\"$component\"}", 
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Cache executor queue size",
+      "id": 9,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 12, "y": 22, "w": 12, "h": 6},
+      "targets": [
+        {
+          "expr": "cache_executor_queue_size{component=\"$component_executor\"}", 
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["last"]}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Executor rejections & task P95",
+      "id": 10,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 28, "w": 12, "h": 6},
+      "targets": [
+        {
+          "expr": "job:cache_executor:rejections:rate5m{component=\"$component_executor\"}", 
+          "legendFormat": "rejections", 
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, job:cache_executor:task_duration_buckets:rate5m{component=\"$component_executor\"})", 
+          "legendFormat": "task_p95", 
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "table",
+      "title": "Recent cache errors (by errorType)",
+      "id": 11,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 6},
+      "targets": [
+        {
+          "expr": "job:cache:errors:last5m{component=\"$component\"}", 
+          "legendFormat": "{{errorType}}", 
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache recache latency (p50 / p95 / p99)",
+      "id": 12,
+      "datasource": "Prometheus",
+      "gridPos": {"x": 0, "y": 34, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, job:cache:load_duration_buckets:rate5m{component=\"$component\"})",
+          "legendFormat": "p50", 
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, job:cache:load_duration_buckets:rate5m{component=\"$component\"})",
+          "legendFormat": "p95", 
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, job:cache:load_duration_buckets:rate5m{component=\"$component\"})",
+          "legendFormat": "p99", 
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "Ambiente",
+        "type": "query",
+        "query": "label_values(gym_operation_hits_total, environment)",
+        "refresh": 2,
+        "multi": false,
+        "includeAll": true
+      },
+      {
+        "name": "container",
+        "label": "Contenedor",
+        "type": "query",
+        "query": "label_values(container_cpu_usage_seconds_total, name)",
+        "refresh": 2,
+        "current": { "text": "Host Total", "value": "/" },
+        "includeAll": true,
+        "multi": false
+      },
+      {
+        "name": "component",
+        "label": "Componente Caché",
+        "type": "query",
+        "query": "label_values(cache_operation_hits_total, component)",
+        "refresh": 2
+      },
+      {
+        "name": "component_executor",
+        "label": "Executor",
+        "type": "query",
+        "query": "label_values(cache_executor_queue_size, component)",
+        "refresh": 2
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "datasource": "Prometheus",
+        "enable": true,
+        "expr": "ALERTS{alertstate=\"firing\", component=\"$component\"}",
+        "iconColor": "red",
+        "name": "Active alert",
+        "textFormat": "Alert: {{alertname}}",
+        "type": "tags"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s","10s","30s","1m","5m","15m","1h"]}
+}

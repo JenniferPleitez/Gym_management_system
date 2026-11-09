@@ -1,0 +1,56 @@
+groups:
+  - name: service_is_down
+    rules:
+      - alert: service_is_down
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service(s) are down for {{ $labels.instance }}"
+          description: "Target with labels: {{ $labels }} is DOWN (up == 0) for more than 2m."
+
+  - name: cache_service_alerts
+    rules:
+      # tenemos que hacer doble verificación en esta porque al recién levantar la app detecta 0 trafico (y 0 es menor que 0.90, por lo que se dispara la alerta)
+      - alert: HighCacheMissRatio
+        expr: |
+              job:cache:hit_rate:ratio5m < 0.90
+              and
+              (job:cache:hits:rate5m + job:cache:misses:rate5m) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High cache miss ratio for {{ $labels.component }}"
+          description: "Cache miss ratio > 10% for component={{ $labels.component }} for more than 5m. Check cache warmup, DB latency and recent deploys."
+
+
+      - alert: CacheErrorsSpike
+        expr: job:cache:errors:last5m > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cache error spike for {{ $labels.component }}"
+          description: "There have been errors for component={{ $labels.component }} in the last 5m. ErrorType={{ $labels.errorType }}"
+
+
+      - alert: ExecutorRejections
+        expr: job:cache_executor:rejections:rate5m > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Executor task rejections detected for {{ $labels.component }}"
+          description: "Some cache executor tasks were rejected (queue full) for component={{ $labels.component }}. Check queue size and throughput."
+
+
+      - alert: CacheRecacheLatencyHigh
+        expr: histogram_quantile(0.95, job:cache:load_duration_buckets:rate5m) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High cache recache latency (p95 > 500ms) for {{ $labels.component }}"
+          description: "p95 cache load duration > 500ms for component={{ $labels.component }} for more than 5m. Review DB latency, executor saturation and recent deployments."
